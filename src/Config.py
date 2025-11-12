@@ -1,5 +1,5 @@
 class Config:
-    def __init__(self, audio_dir_path, num_genres, train_part_size, val_part_size, test_part_size, batch_size, learning_rate, epochs, seed):
+    def __init__(self, audio_dir_path, num_genres, train_part_size, val_part_size, test_part_size, batch_size, learning_rate, epochs, seed, device):
         self.audio_dir_path = audio_dir_path
         self.num_genres = num_genres
         self.train_part_size = train_part_size
@@ -9,3 +9,4 @@ class Config:
         self.learning_rate = learning_rate
         self.epochs = epochs
         self.seed = seed
+        self.device = device
