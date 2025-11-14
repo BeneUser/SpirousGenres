@@ -4,14 +4,14 @@ import os
 import scipy.io.wavfile as wav
 
 class AudioDataset(Dataset):
-    def __init__(self, audio_files, labels, audio_path,
-                 maxlen, sampling_rate, duration):
+    def __init__(self, audio_files, labels, audio_path, sampling_rate, duration):
         self.audio_files = audio_files
         self.audio_path = audio_path
         self.labels = labels
-        self.maxlen = maxlen
+        self.maxlen = sampling_rate * duration
         self.sampling_rate = sampling_rate
         self.duration = duration
+
 
     def __len__(self):
         return len(self.audio_files)
