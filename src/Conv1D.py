@@ -1,19 +1,73 @@
 import torch.nn as nn
 
 class Conv1D(nn.Module):
-    def __init__(self, in_c=1, out_c=64, k=7, use_pool=True, n_classes=10):
+    def __init__(self, input_size, num_blocks, num_conv_layers_per_block, kernel_size, num_first_layer_kernels, conv_stride, pool_stride,  dense_size, do_batch_norm, n_classes, config, channels=None):
         super().__init__()
-        pad = k // 2  
-        self.conv = nn.Conv1d(in_c, out_c, kernel_size=k, stride=2, padding=pad)
-        self.use_pool = use_pool
-        self.pool = nn.MaxPool1d(kernel_size=2, stride=2)
-        self.gap = nn.AdaptiveAvgPool1d(1)
-        self.fc   = nn.Linear(out_c, n_classes)
+        self.config = config #Needed for at train time initialization of dense layer input size. (Must move model to device again)
 
-    def forward(self, x):              
-        x = nn.functional.relu(self.conv(x))       
-        x = self.pool(x)           
-        x = self.gap(x)       
-        x = x.squeeze(-1)            
-        x = self.fc(x)                
+        #By default, double num of kernels each layer.
+        if channels is None:
+            channels = []
+            currnum = num_first_layer_kernels
+            for _ in range(num_blocks):
+                channels.append(currnum)
+                currnum *=2
+
+        #Stack ConvBlocks together
+        layers = []
+        in_channels = 1
+        #conv_out_size = input_size
+        for c in channels:
+            layers.append(ConvBlock(num_conv_layers_per_block, in_channels, c, kernel_size, conv_stride, pool_stride, do_batch_norm))
+            in_channels = c
+        self.conv = nn.Sequential(*layers)
+
+
+        #Dense Layers at the end.
+        self.dense_size = dense_size
+        self.fc1 = None #Allocate at train time to get dimensions right
+        self.fc2 = nn.Linear(dense_size, n_classes)
+
+
+    def forward(self, x):
+        #Conv Layers
+        x = self.conv(x)   
+        #Reshape input
+        x = x.squeeze(-1)
+        x = x.view(x.size(0), -1) #(Batch size, rest)
+        #Allocate fc1 at train time, to get input dimensions right
+        if(self.fc1 == None):
+            self.fc1 = nn.Linear(in_features=x.size(1), out_features=self.dense_size)
+            self.to(self.config.device)
+        #Dense Layers         
+        x = self.fc1(x)
+        x = self.fc2(x)        
+        return x
+
+class ConvBlock(nn.Module):
+    def __init__(self, num_conv_layers, in_channels, out_channels, kernel_size, conv_stride, pool_stride, do_batch_norm):
+        super().__init__()
+        pad = kernel_size // 2
+
+        #Conv Layers with same structure stacked
+        #Conv -> Conv -> ... -> Conv
+        #Usually 1 or 2 layers.
+        layers = []
+        #First conv layer establishes number of channels in stack.
+        layers.append(nn.Conv1d(in_channels, out_channels, kernel_size=kernel_size, stride=conv_stride, padding=pad))
+        for i in range(num_conv_layers-1):
+            layers.append(nn.Conv1d(out_channels, out_channels, kernel_size=kernel_size, stride=conv_stride, padding=pad))
+        
+        self.conv = nn.Sequential(*layers)
+        self.bn = nn.BatchNorm1d(out_channels)
+        self.act = nn.ReLU()
+        self.pool = nn.MaxPool1d(kernel_size=pool_stride, stride=pool_stride)
+        self.do_batch_norm = do_batch_norm #En/disable batch norm
+
+    def forward(self, x):
+        x = self.conv(x)
+        if(self.do_batch_norm):
+            x = self.bn(x)
+        x = self.act(x)
+        x = self.pool(x)
         return x
