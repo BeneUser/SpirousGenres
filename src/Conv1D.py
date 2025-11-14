@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 class Conv1D(nn.Module):
-    def __init__(self, input_size, num_blocks, num_conv_layers_per_block, kernel_size, num_first_layer_kernels, conv_stride, pool_stride,  dense_size, do_batch_norm, n_classes, config, channels=None):
+    def __init__(self, num_blocks, num_conv_layers_per_block, kernel_size, num_first_layer_kernels, conv_stride, pool_stride,  dense_size, do_batch_norm, n_classes, config, channels=None):
         super().__init__()
         self.config = config #Needed for at train time initialization of dense layer input size. (Must move model to device again)
 
