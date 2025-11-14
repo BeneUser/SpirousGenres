@@ -30,4 +30,10 @@ class AudioDataset(Dataset):
         tstart = 0 # Offset from start of song (hyper-parameter!)
         audio_samples = audio_samples[int(self.sampling_rate*tstart):int(self.sampling_rate*(tstart+self.duration))]
 
+
+
+        # write one function for each type of augmention - test outside of the training 
+        # flip 
+        # 3-4types 
+
         return audio_samples, label
