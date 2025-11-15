@@ -3,10 +3,8 @@ import torch
 import os
 import scipy.io.wavfile as wav
 
-import src.Augmentations as aug
-
 class AudioDataset(Dataset):
-    def __init__(self, audio_files, labels, audio_path, sampling_rate, duration, always_augment=None, num_augments=0, print_augments=False):
+    def __init__(self, audio_files, labels, audio_path, sampling_rate, duration, augmentations=None):
         self.audio_files = audio_files
         self.audio_path = audio_path
         self.labels = labels
@@ -14,10 +12,7 @@ class AudioDataset(Dataset):
         self.sampling_rate = sampling_rate
         self.duration = duration
 
-        #Setup array of augmentations to use
-        self.augmentations = aug.choose_augmentations(num_augments, always_augment)
-        if(print_augments):
-            print("Chosen augmentations [" + " -> ".join(a.__name__ for a in self.augmentations) +"]")
+        self.augmentations = augmentations
 
 
     def __len__(self):
@@ -37,8 +32,9 @@ class AudioDataset(Dataset):
         tstart = 0 # Offset from start of song (hyper-parameter!)
         audio_samples = audio_samples[int(self.sampling_rate*tstart):int(self.sampling_rate*(tstart+self.duration))]
         
-        #Augmentation
-        audio_samples = aug.augment(audio_samples, self.augmentations)
+        #Augmentation (if an Augmentation-class instance was provided)
+        if(self.augmentations != None):
+            audio_samples = self.augmentations.augment(audio_samples)
 
         return audio_samples, label
     
