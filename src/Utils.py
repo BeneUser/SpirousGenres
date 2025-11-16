@@ -55,6 +55,9 @@ def train(train_dataset, train_loader, val_dataset, val_loader, model, opt, loss
         epoch_loss = running_loss / len(train_dataset)
         epoch_acc = correct / total
 
+        train_batch_time_cum = batch_time_cum
+        train_batch_time_ave = batch_time_cum / curr_batch
+
         train_losses.append(epoch_loss)
         train_accuracies.append(epoch_acc)
 
@@ -92,7 +95,7 @@ def train(train_dataset, train_loader, val_dataset, val_loader, model, opt, loss
                 correct += c
                 total += t
                 
-            #Print batch time in ms
+            # Print batch time in ms
             curr_batch += 1
             batch_end = time.time_ns()
             batch_time = (batch_end - batch_start) / 1000000 #ms
@@ -106,16 +109,16 @@ def train(train_dataset, train_loader, val_dataset, val_loader, model, opt, loss
         val_acc = correct / total
         val_accuracies.append(val_acc)
 
-        print(f"Epoch {epoch+1}/{config.epochs} -  Val Loss: {avg_val_loss:.4f} |  Val Acc: {val_acc:.2f}%")
-        print(f"epoch {epoch+1}/{config.epochs} | train loss {epoch_loss:.4f} | train acc {epoch_acc:.4f} | time {batch_time_cum/1000.0:.2f}s | per batch {batch_time_cum / num_batches:.2f}ms")
+        print(f"Epoch {epoch+1}/{config.epochs} -  Val Loss: {avg_val_loss:.4f} |  Val Acc: {val_acc:.2f} | train loss {epoch_loss:.4f} | train acc {epoch_acc:.4f} | time {train_batch_time_cum/1000.0:.2f}s | per batch {train_batch_time_ave:.2f}ms")
+        #print(f"epoch {epoch+1}/{config.epochs} | train loss {epoch_loss:.4f} | train acc {epoch_acc:.4f} | time {batch_time_cum/1000.0:.2f}s | per batch {batch_time_cum / num_batches:.2f}ms")
 
     if show_plot == True:
-        print_epoch_evolve(train_losses, train_accuracies, mode="Training")
-        print_epoch_evolve(val_losses, val_accuracies, mode="Validation")
+        print_epoch_evolve(train_losses, train_accuracies, config=config, mode="Training")
+        print_epoch_evolve(val_losses, val_accuracies, config=config, mode="Validation")
 
         
 
-def print_epoch_evolve(history_loss, history_acc, mode):
+def print_epoch_evolve(history_loss, history_acc, config, mode):
     # mode: "Training" or "Validation"
 
     if mode == "Training":
@@ -134,16 +137,17 @@ def print_epoch_evolve(history_loss, history_acc, mode):
     
 
     fig, ax1 = plt.subplots()
+    epochs = range(1, config.epochs + 1)
 
     # Left y-axis → Training/Validation Loss
-    ax1.plot(history_loss, color=color_loss, label=loss_label)
+    ax1.plot(epochs, history_loss, color=color_loss, label=loss_label)
     ax1.set_xlabel('Epoch')
     ax1.set_ylabel(loss_label, color=color_loss)
     ax1.tick_params(axis='y', labelcolor=color_loss)
 
     # Right y-axis → Training/Validation Accuracy
     ax2 = ax1.twinx()
-    ax2.plot(history_acc, color=color_acc, label=acc_label)
+    ax2.plot(epochs, history_acc, color=color_acc, label=acc_label)
     ax2.set_ylabel(acc_label, color=color_acc)
     ax2.tick_params(axis='y', labelcolor=color_acc)
 
