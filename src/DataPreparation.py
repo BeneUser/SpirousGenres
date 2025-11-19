@@ -12,8 +12,8 @@ def get_partitioned_data(config):
     # Build a reduced label map only for selected genres
     label_map = {genre: i for i, genre in enumerate(selected_genres)}
 
-    print(f"Using {config.num_genres} genres: {selected_genres}")
-    print("Updated label map:", label_map)
+    print(f"Using {config.num_genres} genres {selected_genres}")
+    #print("Updated label map:", label_map)
 
 
     audio_files = []
@@ -28,9 +28,7 @@ def get_partitioned_data(config):
             if fname.endswith('.wav'):
                 file_path = os.path.join(genre_path, fname)
                 audio_files.append(file_path)
-                labels.append(label_map[genre])
-
-    print(f"Total selected files: {len(audio_files)}")        
+                labels.append(label_map[genre])     
 
     # ration training - validation - test data
     # 70% Training, 15% Validation, 15% Test
@@ -48,9 +46,7 @@ def get_partitioned_data(config):
         temp_files, temp_labels, test_size=0.5, stratify=temp_labels, random_state=config.seed
     )
 
-    print(f"Training set: {len(train_files)}")
-    print(f"Validation set: {len(val_files)}")
-    print(f"Test set: {len(test_files)}")
+    print(f"Total selected files {len(audio_files)} | Training set {len(train_files)} | Validation set {len(val_files)} | Test set {len(test_files)}")   
 
     assert len(set(train_files) & set(val_files) & set(test_files)) == 0
 
