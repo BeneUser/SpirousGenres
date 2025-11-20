@@ -7,7 +7,7 @@ def batch_accuracy(logits, y):
     return (preds == y).sum().item(), y.size(0)
 
 
-def train(train_dataset, train_loader, val_dataset, val_loader, model, opt, lossfunc, config, show_batch_time=False, show_plot = True):
+def train(train_loader, val_loader, model, opt, lossfunc, config, overwrite_epoch_print=False, show_batch_time=False, show_plot = True):
     model.train()
     train_losses = []
     train_accuracies = []
@@ -35,11 +35,13 @@ def train(train_dataset, train_loader, val_dataset, val_loader, model, opt, loss
 
             opt.zero_grad()
             logits = model(xb)
+            lossfunc.reduction = 'sum'
             loss = lossfunc(logits, yb)
+            running_loss += loss.item()
             loss.backward()
             opt.step()
 
-            running_loss += loss.item() * xb.size(0)
+
             c, t = batch_accuracy(logits, yb)
             correct += c
             total += t
@@ -52,65 +54,28 @@ def train(train_dataset, train_loader, val_dataset, val_loader, model, opt, loss
             if(show_batch_time):
                print(f"({curr_batch}/{num_batches}) batch time {batch_time:.2f}ms | cumulative {batch_time_cum:.2f}ms | average {batch_time_cum / curr_batch:.2f}ms", end="\r")
 
-        epoch_loss = running_loss / len(train_dataset)
+        #Record train loss/acc
+        epoch_loss = running_loss / total
         epoch_acc = correct / total
-
-        train_batch_time_cum = batch_time_cum
-        train_batch_time_ave = batch_time_cum / curr_batch
-
         train_losses.append(epoch_loss)
         train_accuracies.append(epoch_acc)
 
-        
+        #Time stuff
+        train_batch_time_cum = batch_time_cum
+        train_batch_time_ave = batch_time_cum / curr_batch
 
 
-
-        # validation  
-        model.eval()
-        running_loss = 0
-        correct = 0
-        total = 0
-
-        #Timing stuff
-        num_batches = len(val_loader)
-        curr_batch = 0
-        batch_time_cum = 0
-        for data, target in val_loader:
-            batch_start = time.time_ns()
-            if data.dim() == 2:    
-                data = data.unsqueeze(1)
-            if target.dtype != torch.long:
-                target = target.long()
-
-        
-            # Move data to GPU (if available)
-            data, target = data.to(config.device), target.to(config.device) 
-            with torch.no_grad():
-                logits = model(data)
-
-                #Loss
-                running_loss += lossfunc(logits, target)
-                #Accuracy
-                c, t = batch_accuracy(logits, target)
-                correct += c
-                total += t
-                
-            # Print batch time in ms
-            curr_batch += 1
-            batch_end = time.time_ns()
-            batch_time = (batch_end - batch_start) / 1000000 #ms
-            batch_time_cum += batch_time
-            if(show_batch_time):
-                print(f"({curr_batch}/{num_batches}) batch time {batch_time:.2f}ms | cumulative {batch_time_cum:.2f}ms | average {batch_time_cum / curr_batch:.2f}ms", end="\r")
-
-
-        avg_val_loss = running_loss / total
-        val_losses.append(avg_val_loss)
-        val_acc = correct / total
+        #Validation
+        val_loss, val_acc, val_time, _ = test_routine(val_loader, model, lossfunc, config, show_batch_time)  
+        val_losses.append(val_loss)
         val_accuracies.append(val_acc)
 
-        print(f"Epoch {epoch+1}/{config.epochs} -  Val Loss: {avg_val_loss:.4f} |  Val Acc: {val_acc:.2f} | train loss {epoch_loss:.4f} | train acc {epoch_acc:.4f} | time {train_batch_time_cum/1000.0:.2f}s | per batch {train_batch_time_ave:.2f}ms")
-        #print(f"epoch {epoch+1}/{config.epochs} | train loss {epoch_loss:.4f} | train acc {epoch_acc:.4f} | time {batch_time_cum/1000.0:.2f}s | per batch {batch_time_cum / num_batches:.2f}ms")
+        message = f"Epoch {epoch+1}/{config.epochs} -  val loss: {val_loss:.4f} |  val acc: {val_acc:.2f} | train loss {epoch_loss:.4f} | train acc {epoch_acc:.4f} | time {(train_batch_time_cum+val_time)/1000.0:.2f}s | per batch {train_batch_time_ave:.2f}ms"
+        if(overwrite_epoch_print):
+            print(message, end='\r')
+        else:
+            print(message)
+
 
     if show_plot == True:
         print_epoch_evolve(train_losses, train_accuracies, config=config, mode="Training")
@@ -133,7 +98,7 @@ def print_epoch_evolve(history_loss, history_acc, config, mode):
         color_acc = "tab:orange"
         color_loss = "tab:purple"
     else:
-        raise ValueError("mode must be 'Training' or 'Validation'")
+        raise ValueError("mode must be 'Training', 'Validation'")
     
 
     fig, ax1 = plt.subplots()
@@ -160,7 +125,7 @@ def print_epoch_evolve(history_loss, history_acc, config, mode):
     plt.show()
 
 
-def test(test_dataset, test_loader, model, lossfunc, config, show_batch_time=False):
+def test_routine(test_loader, model, lossfunc, config, show_batch_time=False):
     model.eval()
     running_loss = 0.0
     correct = 0.0
@@ -184,7 +149,9 @@ def test(test_dataset, test_loader, model, lossfunc, config, show_batch_time=Fal
             logits = model(data)
 
             #Loss
-            running_loss += lossfunc(logits, target)
+            lossfunc.reduction = 'sum'
+            loss = lossfunc(logits, target)
+            running_loss += loss.item()
             #Accuracy
             c, t = batch_accuracy(logits, target)
             correct += c
@@ -199,6 +166,14 @@ def test(test_dataset, test_loader, model, lossfunc, config, show_batch_time=Fal
             print(f"({curr_batch}/{num_batches}) batch time {batch_time:.2f}ms | cumulative {batch_time_cum:.2f}ms | average {batch_time_cum / curr_batch:.2f}ms", end="\r")
 
 
-    loss = running_loss / len(test_dataset) #MAYBE UNCORRECT?????
-    accuracy = correct / total
-    print(f"test loss {loss:.4f} | test acc {accuracy:.4f} | time {batch_time_cum/1000.0:.2f}s | per batch {batch_time_cum / num_batches:.2f}ms")
+    avg_loss = running_loss / total
+    avg_accuracy = correct / total
+    return avg_loss, avg_accuracy, batch_time_cum, batch_time_cum / num_batches
+
+def test(test_loader, model, lossfunc, config, overwrite_epoch_print=False, show_batch_time=False):
+    avg_loss, avg_accuracy, total_time, per_batch_time = test_routine(test_loader, model, lossfunc, config, show_batch_time)
+    message = f"test loss {avg_loss:.4f} | test acc {avg_accuracy:.4f} | time {total_time/1000.0:.2f}s | per batch {per_batch_time:.2f}ms"
+    if(overwrite_epoch_print):
+        print(message, end='\r')
+    else:
+        print(message)

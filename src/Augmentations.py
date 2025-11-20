@@ -64,6 +64,9 @@ class Augmentations():
 
     def FlipWave(self, audio_samples):
         return -audio_samples
+    
+    def ReverseWave(self, audio_samples):
+        return torch.flip(audio_samples, dims=[0])
 
 
 
